@@ -2,6 +2,9 @@ import axios from "axios";
 import { createPopper } from "@popperjs/core";
 var currentTemplateNumber;
 var currentImageInSlideShow;
+var popperInstance;
+var currentTemplateIdentifier;
+
 export const dataLoader = async (groupId) => {
   try {
     const config = {
@@ -33,24 +36,90 @@ export const dataLoader = async (groupId) => {
   return "success function pass";
 };
 
+function addArrowStyles(document, templates) {
+  var styles = `
+    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="top"] > #arrow {
+      bottom: -4px;
+    }
+    
+    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="bottom"] > #arrow {
+      top: -4px;
+    }
+    
+    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="left"] > #arrow {
+      right: -4px;
+    }
+    
+    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="right"] > #arrow {
+      left: -4px;
+    }
+`;
+  var css = document.createElement("style");
+  css.type = "text/css";
+
+  if (css.styleSheet) css.styleSheet.cssText = styles;
+  else css.appendChild(document.createTextNode(styles));
+
+  document.getElementsByTagName("head")[0].appendChild(css);
+}
+
+function destroyPopper() {
+  if (popperInstance) {
+    popperInstance.destroy();
+    popperInstance = null;
+  }
+}
+
 export const showTemplate = async (document, templates, sliceIndex) => {
-  currentTemplateNumber = -1;
-  var newTemplateDiv = document.createElement("iframe");
-  document.body.append(newTemplateDiv);
+  if (templates.length > 0) {
+    window.addEventListener("popstate", function (event) {
+      if (templates !== [] && currentTemplateNumber !== -1) {
+        console.log(currentTemplateIdentifier);
+        if (
+          document.getElementsByClassName(currentTemplateIdentifier).length > 0
+        ) {
+          let previousTarget = document.getElementsByClassName(
+            currentTemplateIdentifier
+          )[0];
+          previousTarget.classList.remove("Template-Active-Element");
+        }
 
-  let link = document.createElement("link");
+        if (document.getElementById("Overlay-" + currentTemplateIdentifier)) {
+          document
+            .getElementById("Overlay-" + currentTemplateIdentifier)
+            .remove();
+        }
+        if (document.getElementById("Template-" + currentTemplateIdentifier)) {
+          document
+            .getElementById("Template-" + currentTemplateIdentifier)
+            .remove();
+        }
+        currentTemplateNumber = -1;
+      }
+    });
+    currentTemplateNumber = -1;
+    var newTemplateFrame = document.createElement("iframe");
+    newTemplateFrame.setAttribute("frameborder", "0");
+    newTemplateFrame.setAttribute("scrolling", "no");
+    newTemplateFrame.setAttribute("onload", "resizeIframe(this)");
 
-  link.href = "https://dl.dropbox.com/s/no65puvrd19bet1/global.css";
-  link.rel = "stylesheet";
-  link.type = "text/css";
-  newTemplateDiv.contentWindow.document.head.appendChild(link);
+    document.body.append(newTemplateFrame);
 
-  nextTemplate(document, templates.slice(0, sliceIndex), newTemplateDiv);
+    let link = document.createElement("link");
+
+    link.href = "https://dl.dropbox.com/s/i9lrx274ne7wxtu/global-iframe.css";
+    link.rel = "stylesheet";
+    link.type = "text/css";
+    newTemplateFrame.contentWindow.document.head.appendChild(link);
+    nextTemplate(document, templates.slice(0, sliceIndex), newTemplateFrame);
+  }
 };
 
-export const nextTemplate = async (document, templates, newTemplateDiv) => {
-  newTemplateDiv.contentWindow.document.body.innerHTML = "";
-  newTemplateDiv.removeAttribute("style");
+export const nextTemplate = async (document, templates, newTemplateFrame) => {
+  destroyPopper();
+  newTemplateFrame.contentWindow.document.body.innerHTML = "";
+
+  newTemplateFrame.removeAttribute("style");
   //remove previous Template from screen
   if (currentTemplateNumber !== -1) {
     if (
@@ -75,6 +144,12 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
         )
         .remove();
     }
+    //clicks on finish
+    if (currentTemplateNumber === templates.length - 1) {
+      currentTemplateNumber = -1;
+      newTemplateFrame.remove();
+      return;
+    }
   }
 
   currentTemplateNumber = currentTemplateNumber + 1;
@@ -86,59 +161,29 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
       )[0];
     }
 
-    newTemplateDiv.id =
+    newTemplateFrame.id =
       "Template-" + templates[currentTemplateNumber].identifier;
-    newTemplateDiv.contentWindow.document.body.innerHTML +=
+    currentTemplateIdentifier = templates[currentTemplateNumber].identifier;
+    newTemplateFrame.contentWindow.document.body.innerHTML +=
       templates[currentTemplateNumber].DOMString;
 
-    newTemplateDiv.style.padding = "-5px";
-    newTemplateDiv.style.height = "100vh";
-    newTemplateDiv.style.width = "100vh";
-    newTemplateDiv.style.border = "none";
-    newTemplateDiv.style.borderRadius = "4%";
-    newTemplateDiv.style.borderRadius = "4%";
-    newTemplateDiv.style.zIndex = "2147483647";
+    newTemplateFrame.style.padding = "-5px";
+    newTemplateFrame.style.height = "60vh";
+    newTemplateFrame.style.width = "60vh";
+    newTemplateFrame.style.border = "none";
+    newTemplateFrame.style.borderRadius = "4%";
+    newTemplateFrame.style.borderRadius = "4%";
+    newTemplateFrame.style.zIndex = "2147483647";
 
     if (templates[currentTemplateNumber].toolTip === true) {
-      var styles = `
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="top"] > #arrow {
-      bottom: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="bottom"] > #arrow {
-      top: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="left"] > #arrow {
-      right: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="right"] > #arrow {
-      left: -4px;
-    }
-`;
+      addArrowStyles(document, templates);
 
-      let link = document.createElement("link");
-
-      link.href = "https://dl.dropbox.com/s/zlryw0p6ocnvgu3/global.css";
-      link.rel = "stylesheet";
-      link.type = "text/css";
-
-      newTemplateDiv.contentWindow.document.body.appendChild(link);
-      newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "SuperParentComponent"
       )[0].style.backgroundColor = "white";
-      newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "SuperParentComponent"
       )[0].style.borderRadius = "8px";
-
-      newTemplateDiv.contentWindow.document.body.innerHTML +=
-        "<style>" + styles + "</style>";
-
-      // var styleSheet = document.createElement("style");
-      // styleSheet.type = "text/css";
-      // styleSheet.innerText = styles;
-      // newTemplateDiv.contentWindow.document.body.appendChild(styleSheet);
     }
 
     //overlay div
@@ -173,7 +218,7 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
       )[0];
       Target.classList.add("Template-Active-Element");
 
-      createPopper(Target, newTemplateDiv, {
+      popperInstance = createPopper(Target, newTemplateFrame, {
         modifiers: [
           {
             name: "offset",
@@ -185,25 +230,25 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
       });
     }
 
-    var button = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    var button = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Next-Template-Button"
     );
     if (button.length > 0) {
       for (let i = 0; i < button.length; i++) {
         button[i].onclick = function () {
-          nextTemplate(document, templates, newTemplateDiv);
+          nextTemplate(document, templates, newTemplateFrame);
         };
         if (currentTemplateNumber === templates.length - 1)
           button[i].innerHTML = "Finish";
       }
     }
-    var button = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    var button = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Previous-Template-Button"
     );
     if (button.length > 0) {
       for (let i = 0; i < button.length; i++) {
         button[i].onclick = function () {
-          previousTemplate(document, templates, newTemplateDiv);
+          previousTemplate(document, templates, newTemplateFrame);
         };
         if (currentTemplateNumber === 0) button[i].disabled = true;
         if (currentTemplateNumber === 0) button[i].style.cursor = "not-allowed";
@@ -213,7 +258,7 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
 
     // slider functionality
     currentImageInSlideShow = 0;
-    const imagesInSlideShow = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    const imagesInSlideShow = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Slideshow-Image-Display"
     );
     console.log(imagesInSlideShow);
@@ -223,27 +268,38 @@ export const nextTemplate = async (document, templates, newTemplateDiv) => {
       }
       imagesInSlideShow[0].style.display = "block";
 
-      var previousSlideShowImageButton = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      var previousSlideShowImageButton = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "Slideshow-Container-Prev"
       );
       previousSlideShowImageButton[0].onclick = function () {
         previousImageInSlidShow(document, templates);
       };
 
-      var nextSlideShowImageButton = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      var nextSlideShowImageButton = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "Slideshow-Container-Next"
       );
       nextSlideShowImageButton[0].onclick = function () {
         nextImageInSlideShow(document, templates);
       };
     }
+
+    setTimeout(function () {
+      if (templates[currentTemplateNumber].toolTip === true) {
+        newTemplateFrame.scrollIntoView({
+          behavior: "smooth",
+        });
+      }
+    }, 500);
   }
-  // document.body.innerHTML += "<div id='arrow' data-popper-arrow></div>";
 };
 
-export const previousTemplate = async (document, templates, newTemplateDiv) => {
-  newTemplateDiv.contentWindow.document.body.innerHTML = "";
-  newTemplateDiv.removeAttribute("style");
+export const previousTemplate = async (
+  document,
+  templates,
+  newTemplateFrame
+) => {
+  destroyPopper();
+  newTemplateFrame.contentWindow.document.body.innerHTML = "";
   //remove previous Template from screen
   if (currentTemplateNumber !== -1) {
     if (
@@ -279,61 +335,30 @@ export const previousTemplate = async (document, templates, newTemplateDiv) => {
       )[0];
     }
 
-    newTemplateDiv.id =
+    newTemplateFrame.id =
       "Template-" + templates[currentTemplateNumber].identifier;
-    newTemplateDiv.contentWindow.document.body.innerHTML +=
+    currentTemplateIdentifier = templates[currentTemplateNumber].identifier;
+    newTemplateFrame.contentWindow.document.body.innerHTML +=
       templates[currentTemplateNumber].DOMString;
 
-    newTemplateDiv.style.padding = "-5px";
-    newTemplateDiv.style.height = "100vh";
-    newTemplateDiv.style.width = "100vh";
-    newTemplateDiv.style.border = "none";
-    newTemplateDiv.style.borderRadius = "4%";
-    newTemplateDiv.style.borderRadius = "4%";
-    newTemplateDiv.style.zIndex = "2147483647";
+    newTemplateFrame.style.padding = "-5px";
+    newTemplateFrame.style.height = "60vh";
+    newTemplateFrame.style.width = "60vh";
+    newTemplateFrame.style.border = "none";
+    newTemplateFrame.style.borderRadius = "4%";
+    newTemplateFrame.style.borderRadius = "4%";
+    newTemplateFrame.style.zIndex = "2147483647";
 
     if (templates[currentTemplateNumber].toolTip === true) {
-      var styles = `
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="top"] > #arrow {
-      bottom: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="bottom"] > #arrow {
-      top: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="left"] > #arrow {
-      right: -4px;
-    }
-    
-    #Template-${templates[currentTemplateNumber].identifier}[data-popper-placement^="right"] > #arrow {
-      left: -4px;
-    }
-`;
+      addArrowStyles(document, templates);
 
-      let link = document.createElement("link");
-
-      link.href = "https://dl.dropbox.com/s/zlryw0p6ocnvgu3/global.css";
-      link.rel = "stylesheet";
-      link.type = "text/css";
-
-      newTemplateDiv.contentWindow.document.body.appendChild(link);
-      newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "SuperParentComponent"
       )[0].style.backgroundColor = "white";
-      newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "SuperParentComponent"
       )[0].style.borderRadius = "8px";
-
-      newTemplateDiv.contentWindow.document.body.innerHTML +=
-        "<style>" + styles + "</style>";
-
-      // var styleSheet = document.createElement("style");
-      // styleSheet.type = "text/css";
-      // styleSheet.innerText = styles;
-      // newTemplateDiv.contentWindow.document.body.appendChild(styleSheet);
     }
-
     //overlay div
     var overlayDiv = document.createElement("div");
     overlayDiv.id = "Overlay-" + templates[currentTemplateNumber].identifier;
@@ -366,7 +391,7 @@ export const previousTemplate = async (document, templates, newTemplateDiv) => {
       )[0];
       Target.classList.add("Template-Active-Element");
 
-      createPopper(Target, newTemplateDiv, {
+      popperInstance = createPopper(Target, newTemplateFrame, {
         modifiers: [
           {
             name: "offset",
@@ -376,27 +401,30 @@ export const previousTemplate = async (document, templates, newTemplateDiv) => {
           },
         ],
       });
+      newTemplateFrame.scrollIntoView({
+        behavior: "smooth",
+      });
     }
 
-    var button = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    var button = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Next-Template-Button"
     );
     if (button.length > 0) {
       for (let i = 0; i < button.length; i++) {
         button[i].onclick = function () {
-          nextTemplate(document, templates, newTemplateDiv);
+          nextTemplate(document, templates, newTemplateFrame);
         };
         if (currentTemplateNumber === templates.length - 1)
           button[i].innerHTML = "Finish";
       }
     }
-    var button = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    var button = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Previous-Template-Button"
     );
     if (button.length > 0) {
       for (let i = 0; i < button.length; i++) {
         button[i].onclick = function () {
-          previousTemplate(document, templates, newTemplateDiv);
+          previousTemplate(document, templates, newTemplateFrame);
         };
         if (currentTemplateNumber === 0) button[i].disabled = true;
         if (currentTemplateNumber === 0) button[i].style.cursor = "not-allowed";
@@ -406,7 +434,7 @@ export const previousTemplate = async (document, templates, newTemplateDiv) => {
 
     // slider functionality
     currentImageInSlideShow = 0;
-    const imagesInSlideShow = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+    const imagesInSlideShow = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
       "Slideshow-Image-Display"
     );
     console.log(imagesInSlideShow);
@@ -416,28 +444,35 @@ export const previousTemplate = async (document, templates, newTemplateDiv) => {
       }
       imagesInSlideShow[0].style.display = "block";
 
-      var previousSlideShowImageButton = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      var previousSlideShowImageButton = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "Slideshow-Container-Prev"
       );
       previousSlideShowImageButton[0].onclick = function () {
         previousImageInSlidShow(document, templates);
       };
 
-      var nextSlideShowImageButton = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+      var nextSlideShowImageButton = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
         "Slideshow-Container-Next"
       );
       nextSlideShowImageButton[0].onclick = function () {
         nextImageInSlideShow(document, templates);
       };
     }
+    setTimeout(function () {
+      if (templates[currentTemplateNumber].toolTip === true) {
+        newTemplateFrame.scrollIntoView({
+          behavior: "smooth",
+        });
+      }
+    }, 500);
   }
 };
 
 const nextImageInSlideShow = (document, templates) => {
-  var newTemplateDiv = document.getElementById(
+  var newTemplateFrame = document.getElementById(
     "Template-" + templates[currentTemplateNumber].identifier
   );
-  const imagesInSlideShow = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+  const imagesInSlideShow = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
     "Slideshow-Image-Display"
   );
   currentImageInSlideShow++;
@@ -451,10 +486,10 @@ const nextImageInSlideShow = (document, templates) => {
 };
 
 const previousImageInSlidShow = (document, templates) => {
-  var newTemplateDiv = document.getElementById(
+  var newTemplateFrame = document.getElementById(
     "Template-" + templates[currentTemplateNumber].identifier
   );
-  const imagesInSlideShow = newTemplateDiv.contentWindow.document.body.getElementsByClassName(
+  const imagesInSlideShow = newTemplateFrame.contentWindow.document.body.getElementsByClassName(
     "Slideshow-Image-Display"
   );
   currentImageInSlideShow--;
