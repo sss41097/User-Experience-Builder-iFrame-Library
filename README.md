@@ -13,7 +13,7 @@ With this library, you can create exceptional user onboarding experiences for an
 import { dataLoader, showTemplate } from "shellshow-onboard-builder-iframe-wrapper";
 ```
 
-2. Execute the dataLoader() function inside the ComponentDidMount lifecycle in class based component, or useEffect hook in react hooks. You also need to pass the group Id, whose templates you want to show.
+2. Execute the dataLoader() function inside the ComponentDidMount lifecycle in class based component, or useEffect hook in react hooks. You also need to pass the group Id, whose templates you want to show. You need to copy the groupId from the ShellShow's website, where you have created all your templates.
 
 An example with react hooks is given below:
 We call a function "loadTemplates()" in our useEffect,to execute the dataLoader() function with async await feature. Once we receive the templates, we save it in react hooks state variable for using the templates in our website.
